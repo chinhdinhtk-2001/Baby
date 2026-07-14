@@ -200,8 +200,7 @@ export default function App() {
       
       const { error } = await supabase
         .from('baby_journal_db')
-        .update({ db_state: dbState, updated_at: new Date().toISOString() })
-        .eq('id', 1);
+        .upsert({ id: 1, db_state: dbState, updated_at: new Date().toISOString() });
 
       if (error) {
         console.error("Failed to sync database to Supabase:", error.message);
