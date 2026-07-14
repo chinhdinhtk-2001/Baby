@@ -205,20 +205,22 @@ export default function App() {
 
       if (error) {
         console.error("Failed to sync database to Supabase:", error.message);
+        throw new Error(`Đồng bộ dữ liệu thất bại: ${error.message}`);
       } else {
         console.log("Successfully synchronized database to Supabase!");
       }
     } catch (err) {
       console.error("Error during Supabase sync:", err);
+      throw err;
     }
   };
 
   // 4. State Modification Callbacks
-  const handleUpload = (newItem) => {
+  const handleUpload = async (newItem) => {
     const updated = [newItem, ...mediaItems];
     setMediaItems(updated);
     saveMediaToStorage(updated);
-    syncToSupabase(updated, milestonesState);
+    await syncToSupabase(updated, milestonesState);
   };
 
   const handleFavoriteToggle = (item, e) => {

@@ -306,7 +306,7 @@ export default function UploadForm({ onUpload, onViewChange }) {
     const filePath = `photos/${fileName}`;
 
     const { data, error } = await supabase.storage
-      .from('baby-journal')
+      .from('BABY-JOURNAL')
       .upload(filePath, blob, {
         contentType: 'image/jpeg',
         cacheControl: '3600',
@@ -319,7 +319,7 @@ export default function UploadForm({ onUpload, onViewChange }) {
 
     // Get public URL
     const { data: publicUrlData } = supabase.storage
-      .from('baby-journal')
+      .from('BABY-JOURNAL')
       .getPublicUrl(filePath);
 
     return publicUrlData.publicUrl;
@@ -363,7 +363,7 @@ export default function UploadForm({ onUpload, onViewChange }) {
       };
 
       // 4. Save to local storage registry
-      onUpload(newItem);
+      await onUpload(newItem);
       
       // 5. Reset Form
       setTitle('');
@@ -379,7 +379,7 @@ export default function UploadForm({ onUpload, onViewChange }) {
       onViewChange('gallery');
     } catch (err) {
       console.error(err);
-      setErrorMessage(`Lỗi tải lên: ${err.message}. Vui lòng kiểm tra lại cấu hình Cloud Name, Upload Preset hoặc kết nối mạng.`);
+      setErrorMessage(`Lỗi tải lên: ${err.message}. Vui lòng kiểm tra lại kết nối mạng hoặc cấu hình Supabase (URL, API Key, và tạo Public Storage Bucket tên là 'baby-journal').`);
     } finally {
       setIsUploading(false);
     }
