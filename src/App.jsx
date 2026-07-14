@@ -54,7 +54,7 @@ export default function App() {
   const [currentView, setCurrentView] = useState('home');
   const [mediaItems, setMediaItems] = useState([]);
   const [milestonesState, setMilestonesState] = useState({});
-  const [currentTheme, setCurrentTheme] = useState('cream');
+  const [currentTheme, setCurrentTheme] = useState('blue');
   
   // Modal states
   const [selectedMedia, setSelectedMedia] = useState(null);
@@ -112,7 +112,7 @@ export default function App() {
       }
     }
 
-    const savedTheme = localStorage.getItem('baby_app_theme') || 'cream';
+    const savedTheme = localStorage.getItem('baby_app_theme') || 'blue';
     setCurrentTheme(savedTheme);
 
     // Fetch remote state from Supabase
