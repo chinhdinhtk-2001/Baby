@@ -344,7 +344,7 @@ async function uploadToSupabaseStorage(file) {
   const filePath = `milestones/${fileName}`;
 
   const { data, error } = await supabase.storage
-    .from('BABY-JOURNAL')
+    .from('baby-journal')
     .upload(filePath, file, {
       contentType: file.type || 'image/jpeg',
       cacheControl: '3600',
@@ -356,7 +356,7 @@ async function uploadToSupabaseStorage(file) {
   }
 
   const { data: publicUrlData } = supabase.storage
-    .from('BABY-JOURNAL')
+    .from('baby-journal')
     .getPublicUrl(filePath);
 
   return publicUrlData.publicUrl;

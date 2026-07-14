@@ -306,7 +306,7 @@ export default function UploadForm({ onUpload, onViewChange }) {
     const filePath = `photos/${fileName}`;
 
     const { data, error } = await supabase.storage
-      .from('BABY-JOURNAL')
+      .from('baby-journal')
       .upload(filePath, blob, {
         contentType: 'image/jpeg',
         cacheControl: '3600',
@@ -319,7 +319,7 @@ export default function UploadForm({ onUpload, onViewChange }) {
 
     // Get public URL
     const { data: publicUrlData } = supabase.storage
-      .from('BABY-JOURNAL')
+      .from('baby-journal')
       .getPublicUrl(filePath);
 
     return publicUrlData.publicUrl;
