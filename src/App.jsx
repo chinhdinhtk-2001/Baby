@@ -188,6 +188,34 @@ export default function App() {
     localStorage.setItem('baby_milestones_state', JSON.stringify(state));
   };
 
+  const getStoragePathFromUrl = (url) => {
+    if (!url) return null;
+    const lowerUrl = url.toLowerCase();
+    const index = lowerUrl.indexOf('/baby-journal/');
+    if (index !== -1) {
+      return url.substring(index + '/baby-journal/'.length);
+    }
+    return null;
+  };
+
+  const deleteStorageFiles = async (urls) => {
+    if (!urls || urls.length === 0) return;
+    const paths = urls
+      .map(url => getStoragePathFromUrl(url))
+      .filter(path => path !== null);
+
+    if (paths.length > 0) {
+      const { error } = await supabase.storage
+        .from('baby-journal')
+        .remove(paths);
+      if (error) {
+        console.error("Failed to delete files from Supabase Storage:", error.message);
+      } else {
+        console.log("Successfully deleted files from Supabase Storage:", paths);
+      }
+    }
+  };
+
   const syncToSupabase = async (items, milestones) => {
     // Only logged in users (parents) can save changes to Supabase
     const isLoggedInUser = localStorage.getItem('baby_is_logged_in') === 'true';
@@ -241,7 +269,7 @@ export default function App() {
     setDeleteConfirmOpen(true);
   };
 
-  const executeDelete = () => {
+  const executeDelete = async () => {
     if (!mediaToDelete) return;
     const item = mediaToDelete;
     const updated = mediaItems.filter(m => m.id !== item.id);
@@ -271,7 +299,15 @@ export default function App() {
 
     setDeleteConfirmOpen(false);
     setMediaToDelete(null);
-    syncToSupabase(updated, milestoneChanged ? updatedMilestones : milestonesState);
+    await syncToSupabase(updated, milestoneChanged ? updatedMilestones : milestonesState);
+
+    // Delete corresponding physical files from Supabase Storage
+    try {
+      const urlsToDelete = item.urls && item.urls.length > 0 ? item.urls : (item.url ? [item.url] : []);
+      await deleteStorageFiles(urlsToDelete);
+    } catch (err) {
+      console.error("Error during storage file deletion:", err);
+    }
   };
 
   const handleEditClick = (item, e) => {
