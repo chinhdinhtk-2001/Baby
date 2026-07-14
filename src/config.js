@@ -1,7 +1,7 @@
-// Cloudinary Configuration
-export const CLOUDINARY_CONFIG = {
-  cloudName: 'qey3fobe',
-  // Create an UNSIGNED upload preset in Cloudinary Settings -> Upload -> Upload presets
-  // and paste its name below.
-  uploadPreset: 'baby_journal'
+// Supabase Configuration
+// Replace these with your actual project URL and Anon API key from your Supabase Dashboard:
+// Settings -> API
+export const SUPABASE_CONFIG = {
+  url: 'https://hsjmqvzcscfhlparrpgo.supabase.co',
+  anonKey: 'sb_publishable_jt9h_zNOolTW-ZjuOCQgCQ_GFcxz2SK'
 };

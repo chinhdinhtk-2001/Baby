@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
+import { supabase } from './supabaseClient';
 
 // Import components
 import Header from './components/Header';
@@ -114,22 +115,59 @@ export default function App() {
     const savedTheme = localStorage.getItem('baby_app_theme') || 'cream';
     setCurrentTheme(savedTheme);
 
-    // Fetch remote state from Cloudinary
+    // Fetch remote state from Supabase
     const fetchRemoteDb = async () => {
       try {
-        const res = await fetch(`https://res.cloudinary.com/qey3fobe/raw/upload/baby_journal_db?t=${Date.now()}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.mediaItems && data.milestonesState) {
-            setMediaItems(data.mediaItems);
-            setMilestonesState(data.milestonesState);
-            localStorage.setItem('baby_media_items', JSON.stringify(data.mediaItems));
-            localStorage.setItem('baby_milestones_state', JSON.stringify(data.milestonesState));
-            console.log("Successfully synchronized database from Cloudinary!");
+        const { data, error } = await supabase
+          .from('baby_journal_db')
+          .select('db_state')
+          .eq('id', 1)
+          .single();
+
+        if (error) {
+          // If row doesn't exist, we insert the initial state
+          if (error.code === 'PGRST116') {
+            console.log("No remote database found. Creating initial database record...");
+            const initialState = {
+              mediaItems: DEFAULT_MEDIA_ITEMS,
+              milestonesState: {}
+            };
+            const { error: insertError } = await supabase
+              .from('baby_journal_db')
+              .insert({ id: 1, db_state: initialState });
+            if (insertError) {
+              console.error("Failed to insert initial remote database:", insertError);
+            } else {
+              setMediaItems(DEFAULT_MEDIA_ITEMS);
+              setMilestonesState({});
+              localStorage.setItem('baby_media_items', JSON.stringify(DEFAULT_MEDIA_ITEMS));
+              localStorage.setItem('baby_milestones_state', JSON.stringify({}));
+            }
+          } else {
+            console.error("Error fetching database from Supabase:", error.message);
           }
+          return;
+        }
+
+        if (data && data.db_state) {
+          const remoteState = data.db_state;
+          if (remoteState.mediaItems) {
+            // Ensure every item has a urls array of images
+            const migrated = remoteState.mediaItems.map(item => ({
+              ...item,
+              urls: item.urls || (item.url ? [item.url] : [])
+            }));
+            setMediaItems(migrated);
+            localStorage.setItem('baby_media_items', JSON.stringify(migrated));
+          }
+          if (remoteState.milestonesState) {
+            setMilestonesState(remoteState.milestonesState);
+            localStorage.setItem('baby_milestones_state', JSON.stringify(remoteState.milestonesState));
+          }
+          console.log("Successfully synchronized database from Supabase!");
         }
       } catch (err) {
-        console.error("Failed to load remote database from Cloudinary:", err);
+        console.error("Failed to load remote database from Supabase:", err);
       }
     };
     fetchRemoteDb();
@@ -150,9 +188,8 @@ export default function App() {
     localStorage.setItem('baby_milestones_state', JSON.stringify(state));
   };
 
-  const syncToCloudinary = async (items, milestones) => {
-    // Only logged in users (parents) can save changes to Cloudinary
-    // This protects raw storage file from random overwrite
+  const syncToSupabase = async (items, milestones) => {
+    // Only logged in users (parents) can save changes to Supabase
     const isLoggedInUser = localStorage.getItem('baby_is_logged_in') === 'true';
     if (!isLoggedInUser) return;
     try {
@@ -160,25 +197,19 @@ export default function App() {
         mediaItems: items,
         milestonesState: milestones
       };
-      const blob = new Blob([JSON.stringify(dbState)], { type: 'application/json' });
       
-      const formData = new FormData();
-      formData.append('file', blob, 'baby_journal_db.json');
-      formData.append('upload_preset', 'baby_journal');
-      formData.append('public_id', 'baby_journal_db');
-      formData.append('resource_type', 'raw');
-      
-      const res = await fetch(`https://api.cloudinary.com/v1_1/qey3fobe/raw/upload`, {
-        method: 'POST',
-        body: formData
-      });
-      if (!res.ok) {
-        console.error("Failed to sync database to Cloudinary:", await res.text());
+      const { error } = await supabase
+        .from('baby_journal_db')
+        .update({ db_state: dbState, updated_at: new Date().toISOString() })
+        .eq('id', 1);
+
+      if (error) {
+        console.error("Failed to sync database to Supabase:", error.message);
       } else {
-        console.log("Successfully synchronized database to Cloudinary!");
+        console.log("Successfully synchronized database to Supabase!");
       }
     } catch (err) {
-      console.error("Error during Cloudinary sync:", err);
+      console.error("Error during Supabase sync:", err);
     }
   };
 
@@ -187,7 +218,7 @@ export default function App() {
     const updated = [newItem, ...mediaItems];
     setMediaItems(updated);
     saveMediaToStorage(updated);
-    syncToCloudinary(updated, milestonesState);
+    syncToSupabase(updated, milestonesState);
   };
 
   const handleFavoriteToggle = (item, e) => {
@@ -196,7 +227,7 @@ export default function App() {
     );
     setMediaItems(updated);
     saveMediaToStorage(updated);
-    syncToCloudinary(updated, milestonesState);
+    syncToSupabase(updated, milestonesState);
 
     // If modal is open displaying this item, update it
     if (selectedMedia && selectedMedia.id === item.id) {
@@ -239,7 +270,7 @@ export default function App() {
 
     setDeleteConfirmOpen(false);
     setMediaToDelete(null);
-    syncToCloudinary(updated, milestoneChanged ? updatedMilestones : milestonesState);
+    syncToSupabase(updated, milestoneChanged ? updatedMilestones : milestonesState);
   };
 
   const handleEditClick = (item, e) => {
@@ -263,7 +294,7 @@ export default function App() {
     
     // Update active modal item state
     setSelectedMedia(updatedItem);
-    syncToCloudinary(updated, milestonesState);
+    syncToSupabase(updated, milestonesState);
   };
 
   const handleMilestoneUpdate = (id, milestoneValue) => {
@@ -273,7 +304,7 @@ export default function App() {
     };
     setMilestonesState(updated);
     saveMilestonesToStorage(updated);
-    syncToCloudinary(mediaItems, updated);
+    syncToSupabase(mediaItems, updated);
   };
 
   return (

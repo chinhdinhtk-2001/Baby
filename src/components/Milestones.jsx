@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CLOUDINARY_CONFIG } from '../config';
+import { supabase } from '../supabaseClient';
 
 const DEFAULT_MILESTONES = [
   { id: 'ms-start',    title: '01. Khởi đầu',       targetAge: 'Tuần 4 thai kỳ',   desc: 'Ngày biết tin có con, chiếc que thử hai vạch mang lại niềm vui bất ngờ cho ba mẹ.' },
@@ -337,14 +337,29 @@ const BabyFootprint = ({ isLeft, angle, x, y }) => (
   </div>
 );
 
-// ── Cloudinary upload ─────────────────────────────────────────────────────────
-async function uploadToCloudinary(file) {
-  const fd = new FormData();
-  fd.append('file', file);
-  fd.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
-  const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/upload`, { method:'POST', body:fd });
-  if (!res.ok) throw new Error('Upload thất bại');
-  return (await res.json()).secure_url;
+// ── Supabase upload ─────────────────────────────────────────────────────────
+async function uploadToSupabaseStorage(file) {
+  const extension = file.name ? file.name.substring(file.name.lastIndexOf('.')) : '.jpg';
+  const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}${extension}`;
+  const filePath = `milestones/${fileName}`;
+
+  const { data, error } = await supabase.storage
+    .from('baby-journal')
+    .upload(filePath, file, {
+      contentType: file.type || 'image/jpeg',
+      cacheControl: '3600',
+      upsert: false
+    });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const { data: publicUrlData } = supabase.storage
+    .from('baby-journal')
+    .getPublicUrl(filePath);
+
+  return publicUrlData.publicUrl;
 }
 
 // ── Map helpers ───────────────────────────────────────────────────────────────
@@ -441,8 +456,8 @@ export default function Milestones({ milestonesState, onMilestoneUpdate, isLogge
     setUploading(true);
     setUploadErr('');
     try {
-      // Upload all files to Cloudinary in parallel
-      const urls = await Promise.all(files.map(f => uploadToCloudinary(f)));
+      // Upload all files to Supabase Storage in parallel
+      const urls = await Promise.all(files.map(f => uploadToSupabaseStorage(f)));
       const curState = milestonesState[id] || { completed: false, date: '', photoUrls: [] };
       const currentUrls = curState.photoUrls || (curState.photoUrl ? [curState.photoUrl] : []);
       const updatedUrls = [...currentUrls, ...urls];

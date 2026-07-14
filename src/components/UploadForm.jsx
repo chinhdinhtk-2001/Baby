@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { CLOUDINARY_CONFIG } from '../config';
+import { supabase } from '../supabaseClient';
 
 export default function UploadForm({ onUpload, onViewChange }) {
   const [title, setTitle] = useState('');
@@ -286,27 +286,43 @@ export default function UploadForm({ onUpload, onViewChange }) {
     });
   };
 
-  const uploadToCloudinary = async (fileData) => {
-    const formData = new FormData();
-    formData.append('file', fileData);
-    formData.append('upload_preset', CLOUDINARY_CONFIG.uploadPreset);
+  const base64ToBlob = (base64Data) => {
+    const arr = base64Data.split(',');
+    const mime = arr[0].match(/:(.*?);/)[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], { type: mime });
+  };
 
-    const response = await fetch(
-      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CONFIG.cloudName}/upload`,
-      {
-        method: 'POST',
-        body: formData
-      }
-    );
+  const uploadToSupabaseStorage = async (base64Data) => {
+    const blob = base64ToBlob(base64Data);
+    
+    // Generate a unique file name
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.jpg`;
+    const filePath = `photos/${fileName}`;
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      const errorMsg = errorData.error?.message || response.statusText;
-      throw new Error(errorMsg);
+    const { data, error } = await supabase.storage
+      .from('baby-journal')
+      .upload(filePath, blob, {
+        contentType: 'image/jpeg',
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (error) {
+      throw new Error(error.message);
     }
 
-    const data = await response.json();
-    return data.secure_url;
+    // Get public URL
+    const { data: publicUrlData } = supabase.storage
+      .from('baby-journal')
+      .getPublicUrl(filePath);
+
+    return publicUrlData.publicUrl;
   };
 
   const handleSubmit = async (e) => {
@@ -327,9 +343,9 @@ export default function UploadForm({ onUpload, onViewChange }) {
         croppedBase64s.push(cropped);
       }
 
-      // 2. Upload all images to Cloudinary in parallel
+      // 2. Upload all images to Supabase Storage in parallel
       const cloudUrls = await Promise.all(
-        croppedBase64s.map(base64 => uploadToCloudinary(base64))
+        croppedBase64s.map(base64 => uploadToSupabaseStorage(base64))
       );
 
       // 3. Prepare new item record
